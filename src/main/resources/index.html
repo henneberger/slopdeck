@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>SlopDeck</title>
+  <style>
+    /* Global Styles */
+    * {
+        box-sizing: border-box;
+    }
+    body {
+        margin: 0;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f5f8fa;
+    }
+
+    /* Header Styles */
+    #header {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        background-color: #ffffff;
+        padding: 10px 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* Logo Styles */
+    .logo {
+        display: flex;
+        align-items: center;
+    }
+    .logo span {
+        font-size: 24px;
+        font-weight: bold;
+        color: #1da1f2;
+    }
+
+    /* NSFW Toggle Styles */
+    .nsfw-toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        color: #657786;
+    }
+    .nsfw-toggle input[type="checkbox"] {
+        width: 40px;
+        height: 20px;
+        appearance: none;
+        background: #ccc;
+        border-radius: 20px;
+        position: relative;
+        outline: none;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    .nsfw-toggle input[type="checkbox"]:checked {
+        background: #1da1f2;
+    }
+    .nsfw-toggle input[type="checkbox"]::before {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        background: #ffffff;
+        border-radius: 50%;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.3s;
+    }
+    .nsfw-toggle input[type="checkbox"]:checked::before {
+        transform: translateX(20px);
+    }
+
+    /* Columns Layout */
+    #columns {
+        display: flex;
+        margin-top: 60px; /* Adjusted to accommodate the fixed header */
+        height: calc(100vh - 60px);
+        overflow: hidden; /* Prevent body from scrolling */
+        padding: 10px;
+    }
+    .column {
+        flex: 1;
+        border-left: 1px solid #e1e8ed;
+        border-right: 1px solid #e1e8ed;
+        display: flex;
+        flex-direction: column;
+        background-color: #ffffff;
+        position: relative;
+    }
+    .column:first-child {
+        border-left: none;
+    }
+    .column:last-child {
+        border-right: none;
+    }
+    .post-container {
+        padding: 10px;
+        flex: 1;
+        overflow-y: auto; /* Allow vertical scrolling within each column */
+    }
+
+    /* Filter Container Styles */
+    .filter-container {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        background-color: #ffffff;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 1px solid #e1e8ed;
+    }
+    .filter-container input {
+        padding: 6px 10px;
+        border: 1px solid #ccd6dd;
+        border-radius: 20px;
+        width: 100%;
+        max-width: 200px;
+        outline: none;
+        transition: border-color 0.3s;
+    }
+    .filter-container input:focus {
+        border-color: #1da1f2;
+    }
+    .filter-container button {
+        padding: 6px 12px;
+        margin-left: 8px;
+        border: none;
+        background-color: #1da1f2;
+        color: white;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        font-size: 14px;
+    }
+    .filter-container button:hover {
+        background-color: #0d95e8;
+    }
+
+    /* Post Styles */
+    .post {
+        background-color: #ffffff;
+        border: 1px solid #e1e8ed;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: background-color 0.3s, box-shadow 0.3s;
+    }
+    .post:hover {
+        background-color: #f0f8ff;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    }
+    .post-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .post-header .timestamp {
+        margin-left: auto;
+        font-size: 12px;
+        color: #657786;
+    }
+    .post-text {
+        font-size: 16px;
+        color: #14171a;
+        margin-bottom: 10px;
+        overflow-wrap: break-word; /* This is the modern standard */
+        word-wrap: break-word;     /* For backward compatibility */
+        word-break: break-word;    /* Ensures words break appropriately */
+    }
+
+    .post-image img {
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        object-fit: cover;
+    }
+
+    /* NSFW Image Styles */
+    .nsfw-image {
+        opacity: 0.2; /* Default semi-transparent */
+        filter: blur(15px) brightness(0.5); /* Stronger blur and dimming */
+        transition: opacity 0.3s, filter 0.3s;
+        pointer-events: none; /* Prevent interactions with hidden images */
+    }
+
+    .nsfw-image.show {
+        opacity: 1; /* Fully visible when toggle is active */
+        filter: none; /* Remove blur and dimming when revealed */
+        pointer-events: auto; /* Allow interactions with visible images */
+    }
+
+    /* NSFW Text Styles */
+    .nsfw-text {
+        opacity: 0.3; /* Default semi-transparent */
+        filter: blur(8px); /* Apply blur to the text */
+        transition: opacity 0.3s, filter 0.3s;
+    }
+
+    .nsfw-text.show {
+        opacity: 1; /* Fully visible when toggle is active */
+        filter: none; /* Remove blur when revealed */
+    }
+    /* Responsive Design */
+    @media (max-width: 820px) {
+        #columns {
+            flex-direction: column;
+            height: auto; /* Allow height to adjust based on content */
+            overflow: visible; /* Allow body to scroll */
+        }
+        .column {
+            display: block; /* Show all columns stacked */
+            width: 100%;
+            border: none;
+        }
+        .filter-container {
+            position: relative; /* Reset sticky positioning */
+            top: auto;
+            border-bottom: none;
+        }
+        .post-container {
+            overflow-y: visible; /* Allow entire page to scroll */
+        }
+    }
+
+  </style>
+</head>
+<body>
+<div id="header">
+  <div class="logo">
+    <span>SlopDeck</span>
+  </div>
+  <div class="nsfw-toggle">
+    <label for="nsfwToggle">Show NSFW</label>
+    <input type="checkbox" id="nsfwToggle">
+  </div>
+  <!-- Removed filter containers from the header -->
+</div>
+<div id="columns">
+  <!-- Column 1 -->
+  <div class="column">
+    <div class="filter-container">
+      <input type="text" id="searchInput1" placeholder="Filter Column 1" autocomplete="off">
+      <button id="filterButton1">Filter</button>
+    </div>
+    <div class="post-container" id="column1"></div>
+  </div>
+  <!-- Column 2 -->
+  <div class="column">
+    <div class="filter-container">
+      <input type="text" id="searchInput2" placeholder="Filter Column 2" autocomplete="off">
+      <button id="filterButton2">Filter</button>
+    </div>
+    <div class="post-container" id="column2"></div>
+  </div>
+  <!-- Column 3 -->
+  <div class="column">
+    <div class="filter-container">
+      <input type="text" id="searchInput3" placeholder="Filter Column 3" autocomplete="off">
+      <button id="filterButton3">Filter</button>
+    </div>
+    <div class="post-container" id="column3"></div>
+  </div>
+</div>
+<script>
+  // WebSocket connections for each column
+  const webSockets = [null, null, null];
+  const currentColumns = [0, 0, 0];
+  let showNsfw = false; // Default NSFW toggle state
+
+  // Default safe search terms for first-time users
+  const defaultSearchTerms = ["politics", "nature", "cat"];
+
+  // Function to save settings to localStorage
+  function saveSettings() {
+      const settings = {
+          showNsfw: showNsfw
+      };
+      localStorage.setItem('slopDeckSettings', JSON.stringify(settings));
+  }
+
+  // Function to load settings from localStorage
+  function loadSettings() {
+      const settings = localStorage.getItem('slopDeckSettings');
+      if (settings) {
+          return JSON.parse(settings);
+      }
+      return null;
+  }
+
+  // Initialize settings on page load
+  window.addEventListener('DOMContentLoaded', () => {
+      const settings = loadSettings();
+      if (settings) {
+          // Existing user: apply saved settings
+          document.getElementById('searchInput1').value = defaultSearchTerms[0];
+          document.getElementById('searchInput2').value = defaultSearchTerms[1];
+          document.getElementById('searchInput3').value = defaultSearchTerms[2];
+          showNsfw = settings.showNsfw;
+          document.getElementById('nsfwToggle').checked = showNsfw;
+      } else {
+          // First-time user: apply default search terms
+          document.getElementById('searchInput1').value = defaultSearchTerms[0];
+          document.getElementById('searchInput2').value = defaultSearchTerms[1];
+          document.getElementById('searchInput3').value = defaultSearchTerms[2];
+          showNsfw = false;
+          document.getElementById('nsfwToggle').checked = showNsfw;
+          // Save default settings
+          saveSettings();
+      }
+
+      // Apply NSFW settings
+      updateNsfwImages();
+
+      // Start WebSockets with current search terms
+      for (let i = 0; i < 3; i++) {
+          const searchTerm = document.getElementById(`searchInput${i + 1}`).value.trim();
+          if (searchTerm) {
+              startWebSocket(i, searchTerm);
+          }
+      }
+  });
+
+  // Toggle NSFW filter
+  const nsfwToggle = document.getElementById('nsfwToggle');
+  nsfwToggle.addEventListener('change', function() {
+      showNsfw = this.checked;
+      console.log(`NSFW toggle changed: ${showNsfw}`);
+      updateNsfwImages();
+      saveSettings();
+  });
+
+  // Function to update NSFW image and text visibility
+  function updateNsfwImages() {
+      const nsfwImages = document.querySelectorAll('.nsfw-image');
+      nsfwImages.forEach(img => {
+          if (showNsfw) {
+              img.classList.add('show');
+          } else {
+              img.classList.remove('show');
+          }
+      });
+
+      // Handle NSFW text
+      const nsfwTexts = document.querySelectorAll('.nsfw-text');
+      nsfwTexts.forEach(text => {
+          if (showNsfw) {
+              text.classList.add('show');
+          } else {
+              text.classList.remove('show');
+          }
+      });
+  }
+
+  // Function to start WebSocket for a specific column
+  function startWebSocket(columnIndex, filterText) {
+      // Close existing WebSocket if open
+      if (webSockets[columnIndex]) {
+          webSockets[columnIndex].close();
+      }
+
+      // Clear existing posts in the column
+      const column = document.getElementById(`column${columnIndex + 1}`);
+      column.innerHTML = '';
+      currentColumns[columnIndex] = 0;
+
+      // Replace with your actual WebSocket URL
+      const ws = new WebSocket('ws://localhost:8086/events');
+
+      webSockets[columnIndex] = ws;
+
+      ws.onopen = function() {
+          console.log(`WebSocket connection opened for Column ${columnIndex + 1}.`);
+
+          // Send initial filter message or any required initialization
+          const message = {
+              text: filterText
+          };
+          ws.send(JSON.stringify(message));
+      };
+
+      ws.onmessage = function(event) {
+          try {
+              const data = JSON.parse(event.data);
+              console.log(data);
+              addPost(columnIndex, data.imageUrl, data.hrefUrl, data.text, data.createdAt, data.nsfw);
+          } catch (error) {
+              console.error(`Error parsing message for Column ${columnIndex + 1}:`, error);
+          }
+      };
+
+      ws.onclose = function() {
+          console.log(`WebSocket connection closed for Column ${columnIndex + 1}.`);
+      };
+
+      ws.onerror = function(error) {
+          console.error(`WebSocket error for Column ${columnIndex + 1}: `, error);
+      };
+  }
+
+  // Function to add a post to a specific column
+  function addPost(columnIndex, imageUrl, hrefUrl, text, createdAt, nsfw) {
+      // Create anchor element
+      const anchor = document.createElement('a');
+      anchor.href = hrefUrl;
+      anchor.target = '_blank'; // Opens in a new window/tab
+      anchor.rel = 'noopener noreferrer'; // Security best practices
+      anchor.style.textDecoration = 'none'; // Remove underline
+
+      // Create post container
+      const post = document.createElement('div');
+      post.className = 'post';
+
+      // Create post header
+      const postHeader = document.createElement('div');
+      postHeader.className = 'post-header';
+
+      // (Optional) Add user avatar or icon here
+      // For simplicity, we'll skip it or you can add a placeholder
+
+      // Create timestamp element
+      const timestamp = document.createElement('span');
+      timestamp.className = 'timestamp';
+      const date = new Date(createdAt);
+      timestamp.textContent = date.toLocaleString();
+
+      // Append timestamp to post header
+      postHeader.appendChild(timestamp);
+
+      // Create post text
+      const postText = document.createElement('div');
+      postText.className = 'post-text';
+      postText.textContent = text;
+      if (nsfw) {
+          postText.classList.add('nsfw-text');
+      }
+      if (showNsfw) {
+         postText.classList.add('show');
+      } else {
+         postText.classList.remove('show');
+      }
+      // Append text to post
+      post.appendChild(postHeader);
+      post.appendChild(postText);
+
+      // If imageUrl is present, add the image
+      if (imageUrl) {
+          const postImage = document.createElement('div');
+          postImage.className = 'post-image';
+          const img = document.createElement('img');
+          img.src = imageUrl;
+          img.alt = `Post Image ${currentColumns[columnIndex] + 1}`;
+          if (nsfw) {
+              img.classList.add('nsfw-image');
+          }
+          if (showNsfw) {
+             img.classList.add('show');
+          } else {
+             img.classList.remove('show');
+          }
+          img.onload = function() {
+              // Image loaded successfully
+          };
+          img.onerror = function() {
+              console.error(`Failed to load image: ${imageUrl}`);
+              img.style.display = 'none'; // Hide image if failed to load
+          };
+          postImage.appendChild(img);
+          post.appendChild(postImage);
+      }
+
+      // Append post to the column
+      anchor.appendChild(post);
+      const column = document.getElementById(`column${columnIndex + 1}`);
+      column.insertBefore(anchor, column.firstChild);
+      currentColumns[columnIndex]++;
+  }
+
+  // Function to apply filter for a specific column
+  function applyFilter(columnIndex) {
+      const input = document.getElementById(`searchInput${columnIndex + 1}`);
+      const filterText = input.value.trim();
+      if (filterText) {
+          startWebSocket(columnIndex, filterText);
+          saveSettings(); // Save the updated search term
+      } else {
+          alert('Please enter a filter text.');
+      }
+  }
+
+  // Attach event listeners to filter buttons and input fields
+  for (let i = 0; i < 3; i++) {
+      const button = document.getElementById(`filterButton${i + 1}`);
+      button.addEventListener('click', () => applyFilter(i));
+
+      const input = document.getElementById(`searchInput${i + 1}`);
+      input.addEventListener('keydown', function(event) {
+          if (event.key === 'Enter') {
+              applyFilter(i);
+          }
+      });
+  }
+
+  // Optional: Close WebSockets when the page is unloaded
+  window.addEventListener('beforeunload', function() {
+      webSockets.forEach((ws, index) => {
+          if (ws) {
+              ws.close();
+          }
+      });
+  });
+</script>
+</body>
+</html>
