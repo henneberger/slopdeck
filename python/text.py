@@ -16,7 +16,7 @@ MAX_TOKENS = 77
 app = Flask(__name__)
 
 # Model and processor initialization
-device = "cuda" if torch.backends.mps.is_available() else "cpu"
+device = "mps" if torch.backends.mps.is_available() else "cpu"
 model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 

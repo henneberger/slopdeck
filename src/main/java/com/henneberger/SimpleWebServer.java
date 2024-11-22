@@ -41,10 +41,10 @@ import org.java_websocket.server.WebSocketServer;
 public class SimpleWebServer {
 
     // Configuration
-    private static final int HTTP_PORT = 8080;
+    private static final int HTTP_PORT = 80;
     private static final int WS_PORT = 8086;
     private static final double IMAGE_SIMILARITY_THRESHOLD = 0.26;
-    private static final double TEXT_SIMILARITY_THRESHOLD = 0.92;
+    private static final double TEXT_SIMILARITY_THRESHOLD = 0.90;
     private static final int MESSAGE_HISTORY_LIMIT = 50000; // New: Limit for message history
     private static final int MAX_MESSAGES = 50;
 
@@ -483,7 +483,6 @@ public class SimpleWebServer {
                 if (response.statusCode() == 200) {
                     // Parse the response JSON
                     Map<String, Object> responseBody = mapper.readValue(response.body(), Map.class);
-                    System.out.println(responseBody);
                     List<List<Double>> latentVectorList = (List<List<Double>>) responseBody.get("latent_vector");
                     if (latentVectorList != null && !latentVectorList.isEmpty()) {
                         List<Double> latentVectorInner = latentVectorList.get(0);

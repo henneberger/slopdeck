@@ -5,10 +5,12 @@ AWS_REGION="us-east-1"
 INSTANCE_TYPE="c8g.2xlarge" # Minimum 2GB memory
 KEY_NAME="newkey2"
 SECURITY_GROUP="sg-0044649c05b1f6ce5"
-AMI_ID="ami-055e62b4ea2fe95fd" # Amazon Linux 2 AMI (x86_64)
+#AMI_ID="ami-012967cc5a8c9f891" # Amazon Linux 2 AMI (x86_64)
+#AMI_ID="ami-055e62b4ea2fe95fd" # Amazon Linux 2 AMI (ARM)
+AMI_ID="ami-09b3a3e4ffe435bbb" # myapi
 TAG="SimpleServiceDeploy"
 SPOT_PRICE="0.05"
-INSTANCE_ID=""
+#INSTANCE_ID="i-04694fc33a40fba11"
 USER_DATA=$(base64 -i start.sh)
 
 # Launch EC2 instance
@@ -79,7 +81,7 @@ ssh -o StrictHostKeyChecking=no -i "~/$KEY_NAME.pem" ec2-user@$PUBLIC_DNS <<EOF
 # Update and install dependencies
 sudo yum update -y
 sudo yum install -y java python3.11 python3.11-pip git
-sudo pip3.11 install torch Pillow torchvision transformers flask
+sudo pip3.11 install torch Pillow torchvision transformers flask gunicorn
 mkdir -p ~/services/java
 mkdir -p ~/services/python
 
@@ -98,14 +100,12 @@ scp -i "~/$KEY_NAME.pem" \
     python/text.py \
     ec2-user@$PUBLIC_DNS:~/services/python/
 
-scp -i "~/$KEY_NAME.pem" \
-    start.sh \
-    ec2-user@$PUBLIC_DNS:~
+scp -i "~/$KEY_NAME.pem" start.sh ec2-user@$PUBLIC_DNS:~
 
 # Start services on the instance
 ssh -i "~/$KEY_NAME.pem" ec2-user@$PUBLIC_DNS <<EOF
 chmod +x ~/start.sh
-~/start.sh
+sh ~/start.sh
 EOF
 
 

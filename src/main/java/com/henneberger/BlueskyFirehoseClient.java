@@ -129,8 +129,11 @@ public class BlueskyFirehoseClient extends WebSocketClient {
           return;
         }
 
-        if (block.getEmbed() != null && block.getEmbed().getImages() != null) {
+        if (block.getEmbed() != null && block.getEmbed().getImages() != null && block.getReply() == null) {
           for (Image image : block.getEmbed().getImages()) {
+            if (!image.getImage().getMimeType().equalsIgnoreCase("image/jpeg")){
+              continue;
+            }
 
             CompletableFuture<ClassifyResult> doubleCompletableFuture = BlueskyDownloader.enqueueDownload(
                 image.getImage().getRef(),
@@ -152,7 +155,7 @@ public class BlueskyFirehoseClient extends WebSocketClient {
             });
             break;
           }
-        } else if (false && random.nextBoolean()&& random.nextBoolean()&&block.getText() != null && block.getText().length() > 30) {
+        } else if (random.nextBoolean() &&block.getText() != null && block.getText().length() > 30 && block.getReply() == null) {
           CompletableFuture<Double[]> doubleCompletableFuture = encodeLatentText(block.getText());
           doubleCompletableFuture.thenAccept((x) -> {
             SimpleWebServer.postQueue.add(
