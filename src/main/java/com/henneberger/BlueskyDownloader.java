@@ -20,7 +20,7 @@ public class BlueskyDownloader {
 
     private static final int INITIAL_PERMITS_PER_SECOND = 20; // Derived from 3000/300
     private static final RateLimiter rateLimiter = new RateLimiter(INITIAL_PERMITS_PER_SECOND);
-    private static final int THREAD_POOL_SIZE = 40; // Control parallelism
+    private static final int THREAD_POOL_SIZE = 8; // Control parallelism
     private static final int DOWNLOAD_DELAY_SECONDS = 10;
     private static final AtomicBoolean wait = new AtomicBoolean(false);
 

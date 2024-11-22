@@ -278,7 +278,7 @@
   let showNsfw = false; // Default NSFW toggle state
 
   // Default safe search terms for first-time users
-  const defaultSearchTerms = ["politics", "nature", "cat"];
+  const defaultSearchTerms = ["politics", "dog", "cat"];
 
   // Function to save settings to localStorage
   function saveSettings() {
@@ -374,7 +374,9 @@
       currentColumns[columnIndex] = 0;
 
       // Replace with your actual WebSocket URL
-      const ws = new WebSocket('ws://localhost:8086/events');
+      const hostname = window.location.hostname;
+      console.log("Hostname:", hostname);
+      const ws = new WebSocket('ws://'+hostname+':8086/events');
 
       webSockets[columnIndex] = ws;
 

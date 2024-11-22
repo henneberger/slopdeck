@@ -471,7 +471,7 @@ public class SimpleWebServer {
 
                 // Build the HTTP request
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(FLASK_SERVER_URL + "/embed_text"))
+                    .uri(URI.create("http://localhost:6001/embed_text"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();

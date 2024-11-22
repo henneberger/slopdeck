@@ -44,7 +44,7 @@ public class BlueskyFirehoseClient extends WebSocketClient {
 
   private static final Random random = new Random();
   private static final BlockingQueue<Process> processQueue = new LinkedBlockingQueue<>();
-  private static final int THREAD_POOL_SIZE = 10;
+  private static final int THREAD_POOL_SIZE = 7;
   private static final ExecutorService threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
   public static final String FLASK_SERVER_URL = "http://localhost:6000";
 
@@ -152,7 +152,7 @@ public class BlueskyFirehoseClient extends WebSocketClient {
             });
             break;
           }
-        } else if (random.nextBoolean()&&block.getText() != null && block.getText().length() > 30) {
+        } else if (false && random.nextBoolean()&& random.nextBoolean()&&block.getText() != null && block.getText().length() > 30) {
           CompletableFuture<Double[]> doubleCompletableFuture = encodeLatentText(block.getText());
           doubleCompletableFuture.thenAccept((x) -> {
             SimpleWebServer.postQueue.add(
@@ -181,7 +181,7 @@ public class BlueskyFirehoseClient extends WebSocketClient {
   }
 
   private static Double[] encodeLatentText(HttpClient client, String text) {
-    String flaskUrl = "http://127.0.0.1:6000/embed_text";
+    String flaskUrl = "http://127.0.0.1:6001/embed_text";
 
     try {
       String payload = mapper.writeValueAsString(Map.of("input_text", text));
