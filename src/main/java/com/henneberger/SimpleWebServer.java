@@ -1,6 +1,5 @@
 package com.henneberger;
 
-import static com.henneberger.BlueskyFirehoseClient.FLASK_SERVER_URL;
 import static com.henneberger.BlueskyFirehoseClient.httpClient;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -44,14 +43,16 @@ import org.java_websocket.server.WebSocketServer;
  * Note: Replace `:` with `;` on Windows.
  */
 public class SimpleWebServer {
+    private static final BlueskyFirehoseClient firehoseClient = new BlueskyFirehoseClient();
 
     // Configuration
     private static final int HTTP_PORT = 80;
     private static final int WS_PORT = 8086;
-    private static final double IMAGE_SIMILARITY_THRESHOLD = 0.26;
+    private static final double IMAGE_SIMILARITY_THRESHOLD = 0.27;
     private static final double TEXT_SIMILARITY_THRESHOLD = 0.90;
     private static final int MESSAGE_HISTORY_LIMIT = 100000; // New: Limit for message history
     private static final int MAX_MESSAGES = 50;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     private static final ObjectMapper mapper = new ObjectMapper();
     // BlockingQueue for ImageData
@@ -60,7 +61,6 @@ public class SimpleWebServer {
     // List to hold active WebSocket clients
     private final CopyOnWriteArrayList<ClientSession> clients = new CopyOnWriteArrayList<>();
 
-    // New: Deque to store the last 1000 messages
     private final Deque<PostData> messageHistory = new ConcurrentLinkedDeque<>();
 
     public static void main(String[] args) throws Exception {
@@ -125,6 +125,25 @@ public class SimpleWebServer {
         // Start Image Producer (Simulate incoming images)
         Thread producerThread = new Thread(this::runProduction);
         producerThread.start();
+
+        startPeriodicStatsBroadcast();
+    }
+
+    private void startPeriodicStatsBroadcast() {
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                broadcastStats();
+            } catch (Exception e) {
+                System.err.println("Error broadcasting stats: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }, 0, 10, TimeUnit.SECONDS);
+    }
+
+    private void broadcastStats() {
+        for (ClientSession client : clients) {
+            sendStats(client);
+        }
     }
 
     /**
@@ -296,6 +315,7 @@ public class SimpleWebServer {
      */
     private void broadcastImage(PostData postData) {
         for (ClientSession client : clients) {
+
             if (client.filterVector != null) {
                 double similarity = cosineSimilarity(postData.latentVector, client.filterVector);
 
@@ -352,7 +372,7 @@ public class SimpleWebServer {
 
 
     public static enum PostType {
-        IMAGE, TEXT
+        IMAGE, TEXT, FOLLOWS, BEING_FOLLOWED, LIKES
     }
     /**
      * Represents a connected WebSocket client.
@@ -500,8 +520,34 @@ public class SimpleWebServer {
             for (PostData post : recentMessages) {
                 client.sendPost(post);
             }
+            sendStats(client);
         }
 
+    }
+
+    private void sendStats(ClientSession client) {
+
+        BlueskyFirehoseClient.topLikes.current.stream().findFirst().ifPresent(e-> {
+            client.sendPost(new PostData(
+                PostType.LIKES,
+                e.getCount() +"",
+                null, e.getHref(), null, null, false
+            ));
+        });
+        BlueskyFirehoseClient.topFollows.current.stream().findFirst().ifPresent(e-> {
+            client.sendPost(new PostData(
+                PostType.FOLLOWS,
+                e.getCount() +"",
+                null, e.getHref(), null, null, false
+            ));
+        });
+        if (BlueskyFirehoseClient.topBeingFollowed.current.size() > 1) {
+            client.sendPost(new PostData(
+                PostType.BEING_FOLLOWED,
+                BlueskyFirehoseClient.topBeingFollowed.current.get(1).getCount() + "",
+                null, BlueskyFirehoseClient.topBeingFollowed.current.get(1).getHref(), null, null, false
+            ));
+        }
     }
 
     /**

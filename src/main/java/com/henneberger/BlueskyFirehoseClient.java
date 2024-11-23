@@ -8,18 +8,21 @@ import co.nstant.in.cbor.model.DataItem;
 import co.nstant.in.cbor.model.SimpleValue;
 import co.nstant.in.cbor.model.UnicodeString;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.henneberger.ActiveUsersTracker.EventType;
+import com.henneberger.ActiveUsersTracker.LikeEvent;
 import com.henneberger.BlueskyDownloader.ClassifyResult;
 import com.henneberger.JsonRecord.Block;
 import com.henneberger.JsonRecord.Embed.Image;
 import com.henneberger.SimpleWebServer.PostData;
 import com.henneberger.SimpleWebServer.PostType;
 import io.ipfs.cid.Cid;
-import java.io.File;
+import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -30,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 import lombok.Data;
+import lombok.SneakyThrows;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -53,10 +57,18 @@ public class BlueskyFirehoseClient extends WebSocketClient {
   // Initialize a shared HttpClient
   public static final HttpClient httpClient = HttpClient.newHttpClient();
 
+  public static final ActiveUsersTracker topLikes = new ActiveUsersTracker(EventType.LIKE);
+  public static final ActiveUsersTracker topBeingFollowed = new ActiveUsersTracker(EventType.BEING_FOLLOWED);
+  public static final ActiveUsersTracker topFollows = new ActiveUsersTracker(EventType.FOLLOWING);
 
-  public BlueskyFirehoseClient(URI serverUri) {
-    super(serverUri);
-
+  @SneakyThrows
+  public BlueskyFirehoseClient() {
+    super(toUri(FIREHOSE_URI));
+    topLikes.start();
+    Thread.sleep(100);
+    topBeingFollowed.start();
+    Thread.sleep(100);
+    topFollows.start();
     // Start a thread to constantly process download requests
     Thread worker = new Thread(() -> {
       while (true) {
@@ -74,6 +86,14 @@ public class BlueskyFirehoseClient extends WebSocketClient {
       }
     });
     worker.start();
+  }
+
+  private static URI toUri(String firehoseUri) {
+    try {
+      return new URI(firehoseUri);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   @Override
@@ -110,23 +130,43 @@ public class BlueskyFirehoseClient extends WebSocketClient {
 
       Object items = convertCborToJava(decode.get(1), repo);
 
-//      System.out.println(items);
       String s = mapper.writeValueAsString(items);
+//      System.out.println(s);
 
       JsonRecord jsonRecord = mapper.readValue(s, JsonRecord.class);
+
       if (jsonRecord.getBlocks() == null) {
         return;
       }
       if (jsonRecord.getOps().isEmpty()) {
         return;
       }
+
       for (Block block : jsonRecord.getBlocks()) {
+
         String path = jsonRecord.getOps().get(0).getPath();
         String uniquePath = path.substring(path.indexOf("/") + 1);
         String op = jsonRecord.getOps().get(0).getPath()
             .substring(0, jsonRecord.getOps().get(0).getPath().indexOf("/"));
-        if (!op.equalsIgnoreCase("app.bsky.feed.post")) {
+        if (op.equals("app.bsky.feed.like")) {
+          topLikes.likeEvents.add(new LikeEvent(jsonRecord.getRepo(),
+              System.currentTimeMillis()));
           return;
+        }
+        if (op.equals("app.bsky.graph.follow")) {
+          if (block.getSubject() instanceof String) {
+            topBeingFollowed.likeEvents.add(new LikeEvent((String)block.getSubject(),
+                System.currentTimeMillis()));
+          }
+          if (block.getDid() != null)  {
+            topFollows.likeEvents.add(new LikeEvent((String)jsonRecord.getRepo(),
+                System.currentTimeMillis()));
+          }
+
+        }
+
+        if (!op.equalsIgnoreCase("app.bsky.feed.post")) {
+          continue;
         }
 
         if (block.getEmbed() != null && block.getEmbed().getImages() != null && block.getReply() == null) {
@@ -134,6 +174,10 @@ public class BlueskyFirehoseClient extends WebSocketClient {
             if (!image.getImage().getMimeType().equalsIgnoreCase("image/jpeg")){
               continue;
             }
+            if (!jsonRecord.getOps().get(0).getAction().equals("create")) {
+              continue;
+            }
+
 
             CompletableFuture<ClassifyResult> doubleCompletableFuture = BlueskyDownloader.enqueueDownload(
                 image.getImage().getRef(),
@@ -260,8 +304,7 @@ public class BlueskyFirehoseClient extends WebSocketClient {
 
   public static void main(String[] args) {
     try {
-      URI uri = new URI(FIREHOSE_URI);
-      BlueskyFirehoseClient client = new BlueskyFirehoseClient(uri);
+      BlueskyFirehoseClient client = new BlueskyFirehoseClient();
       client.connectBlocking();
     } catch (Exception e) {
       System.err.println("Failed to connect to the Bluesky firehose: " + e.getMessage());
@@ -468,6 +511,7 @@ class JsonRecord {
   @Data
   public static class Block {
 
+    @JsonIgnore
     private List<Element> e;
     private String l;
     private String sig;
@@ -494,9 +538,13 @@ class JsonRecord {
     @Data
     public static class Element {
 
+      @JsonIgnore
       private int p;
+      @JsonIgnore
       private String t;
+      @JsonIgnore
       private String v;
+      @JsonIgnore
       private String k;
     }
 

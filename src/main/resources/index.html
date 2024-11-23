@@ -210,6 +210,34 @@
         opacity: 1; /* Fully visible when toggle is active */
         filter: none; /* Remove blur when revealed */
     }
+ /* Top Users Bar Styles */
+    .top-users-bar {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        background-color: #ffffff;
+        position: sticky;
+        top: 60px; /* Adjusted to appear below the header */
+        z-index: 10;
+        border-bottom: 1px solid #e1e8ed;
+        gap: 10px;
+        justify-content: center;
+    }
+   .top-users-bar a {
+        padding: 6px 12px;
+        border: 1px solid #ccd6dd;
+        border-radius: 20px;
+        text-decoration: none;
+        color: #1da1f2;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: visible; /* Allow text to expand naturally */
+        text-overflow: unset; /* Prevent truncation */
+    }
+
+    .top-users-bar a:hover {
+        background-color: #f0f8ff;
+    }
     /* Responsive Design */
     @media (max-width: 820px) {
         #columns {
@@ -245,6 +273,14 @@
   </div>
   <!-- Removed filter containers from the header -->
 </div>
+
+<!-- Top Users Section -->
+<!-- Top Users Bar -->
+<div class="top-users-bar" id="topUsersBar">
+  <a href="#" id="topLikesUser" target="_blank">User with most likes</a>
+  <a href="#" id="topFollowsUser" target="_blank">User with most follows</a>
+  <a href="#" id="topBeingFollowedUser" target="_blank">User with most being followed</a>
+</div>
 <div id="columns">
   <!-- Column 1 -->
   <div class="column">
@@ -278,7 +314,7 @@
   let showNsfw = false; // Default NSFW toggle state
 
   // Default safe search terms for first-time users
-  const defaultSearchTerms = ["politics", "dog", "cat"];
+  const defaultSearchTerms = ["bluesky", "dog", "cat"];
 
   // Function to save settings to localStorage
   function saveSettings() {
@@ -394,7 +430,11 @@
           try {
               const data = JSON.parse(event.data);
               console.log(data);
-              addPost(columnIndex, data.imageUrl, data.hrefUrl, data.text, data.createdAt, data.nsfw);
+              if (data.type === 'IMAGE' || data.type === 'TEXT') {
+                  addPost(columnIndex, data.imageUrl, data.hrefUrl, data.text, data.createdAt, data.nsfw);
+              } else if (['LIKES', 'FOLLOWS', 'BEING_FOLLOWED'].includes(data.type)) {
+                  handleUserEvent(data);
+              }
           } catch (error) {
               console.error(`Error parsing message for Column ${columnIndex + 1}:`, error);
           }
@@ -512,6 +552,47 @@
       });
   }
 
+  // Function to handle new event types
+  function handleUserEvent(data) {
+      const user = getUserFromHref(data.hrefUrl);
+      if (!user) return;
+
+      let statsCategory;
+
+      if (data.type === 'LIKES') {
+          statsCategory = 'likes';
+      } else if (data.type === 'FOLLOWS') {
+          statsCategory = 'follows';
+      } else if (data.type === 'BEING_FOLLOWED') {
+          statsCategory = 'being_followed';
+      }
+
+      // Now update the UI
+      updateTopUserLink(statsCategory, user, data.hrefUrl, parseInt(data.text));
+  }
+
+  // Function to update the top user links
+  function updateTopUserLink(statsCategory, user, hrefUrl, count) {
+      const linkId = statsCategory === 'likes' ? 'topLikesUser' :
+                     statsCategory === 'follows' ? 'topFollowsUser' :
+                     'topBeingFollowedUser';
+      const linkElement = document.getElementById(linkId);
+      linkElement.href = hrefUrl;
+      linkElement.textContent = `${statsCategory} ${user} (${count})`;
+  }
+
+  // Helper function to extract user from hrefUrl
+  function getUserFromHref(hrefUrl) {
+      try {
+          const url = new URL(hrefUrl);
+          const pathSegments = url.pathname.split('/');
+          // Assuming the username is the last segment
+          return pathSegments[pathSegments.length - 1] || null;
+      } catch (e) {
+          console.error(`Error parsing hrefUrl: ${hrefUrl}`, e);
+          return null;
+      }
+  }
   // Optional: Close WebSockets when the page is unloaded
   window.addEventListener('beforeunload', function() {
       webSockets.forEach((ws, index) => {
