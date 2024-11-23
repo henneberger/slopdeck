@@ -376,7 +376,7 @@
       // Replace with your actual WebSocket URL
       const hostname = window.location.hostname;
       console.log("Hostname:", hostname);
-      const ws = new WebSocket('ws://'+hostname+':8086/events');
+      const ws = new WebSocket('wss://'+hostname+':8086/events');
 
       webSockets[columnIndex] = ws;
 

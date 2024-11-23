@@ -238,6 +238,18 @@ public class BlueskyFirehoseClient extends WebSocketClient {
   @Override
   public void onClose(int code, String reason, boolean remote) {
     System.out.println("Disconnected from the firehose. Reason: " + reason);
+
+    // Delay before reconnecting to prevent immediate reconnection loops
+    Thread reconnectThread = new Thread(() -> {
+      try {
+        Thread.sleep(5000); // 5-second delay
+        reconnect();
+      } catch (InterruptedException e) {
+        System.err.println("Reconnection attempt interrupted: " + e.getMessage());
+        Thread.currentThread().interrupt();
+      }
+    });
+    reconnectThread.start();
   }
 
   @Override

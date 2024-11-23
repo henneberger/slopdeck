@@ -11,14 +11,19 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.util.*;
 import java.util.concurrent.*;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocketFactory;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
 import org.java_websocket.server.WebSocketServer;
 
 /**
@@ -45,7 +50,7 @@ public class SimpleWebServer {
     private static final int WS_PORT = 8086;
     private static final double IMAGE_SIMILARITY_THRESHOLD = 0.26;
     private static final double TEXT_SIMILARITY_THRESHOLD = 0.90;
-    private static final int MESSAGE_HISTORY_LIMIT = 50000; // New: Limit for message history
+    private static final int MESSAGE_HISTORY_LIMIT = 100000; // New: Limit for message history
     private static final int MAX_MESSAGES = 50;
 
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -63,6 +68,39 @@ public class SimpleWebServer {
         server.startServers();
     }
 
+    private void startHttpsServer() {
+        try {
+            SSLServerSocketFactory factory = getSSLServerSocketFactory();
+            try (ServerSocket serverSocket = factory.createServerSocket(443)) {
+                System.out.println("HTTPS Server started on port: " + 443);
+                while (true) {
+                    Socket clientSocket = serverSocket.accept();
+                    Thread handler = new Thread(() -> handleHttpRequest(clientSocket));
+                    handler.start();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private SSLServerSocketFactory getSSLServerSocketFactory() throws Exception {
+        // Load the keystore containing the server certificate and private key
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        try (InputStream keyStoreStream = new FileInputStream("/Users/henneberger/.acme.sh/slopdeck.henneberger.dev_ecc/slopdeck.henneberger.dev.p12")) {
+            keyStore.load(keyStoreStream, "".toCharArray());
+        }
+
+        // Initialize KeyManagerFactory with the keystore
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyManagerFactory.init(keyStore, "".toCharArray());
+
+        // Initialize SSLContext with the KeyManager
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
+
+        return sslContext.getServerSocketFactory();
+    }
     /**
      * Starts the HTTP and WebSocket servers and initializes the image producer and consumer.
      */
@@ -70,6 +108,9 @@ public class SimpleWebServer {
         // Start HTTP Server
         Thread httpThread = new Thread(this::startHttpServer);
         httpThread.start();
+
+        Thread httpsThread = new Thread(this::startHttpsServer);
+        httpsThread.start();
 
         // Start WebSocket Server
         ImageWebSocketServer wsServer = new ImageWebSocketServer(new InetSocketAddress(WS_PORT));
@@ -347,8 +388,28 @@ public class SimpleWebServer {
 
         ImageWebSocketServer(InetSocketAddress address) {
             super(address);
+            SSLContext sslContext = getSSLContext();
+            setWebSocketFactory(new DefaultSSLWebSocketServerFactory(sslContext));
         }
 
+        @SneakyThrows
+        private SSLContext getSSLContext()  {
+            // Load the keystore containing the server certificate and private key
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            try (InputStream keyStoreStream = new FileInputStream("/Users/henneberger/.acme.sh/slopdeck.henneberger.dev_ecc/slopdeck.henneberger.dev.p12")) {
+                keyStore.load(keyStoreStream, "".toCharArray());
+            }
+
+            // Initialize KeyManagerFactory with the keystore
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(keyStore, "".toCharArray());
+
+            // Initialize SSLContext with the KeyManager
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
+
+            return sslContext;
+        }
         @Override
         public void onOpen(WebSocket conn, ClientHandshake handshake) {
             System.out.println("New WebSocket connection from " + conn.getRemoteSocketAddress());
